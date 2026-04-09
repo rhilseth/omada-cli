@@ -16,15 +16,12 @@ pub fn load(omadac_id: &str) -> Option<ApiSpec> {
     let path = cache_path(omadac_id)?;
     let bytes = std::fs::read(&path).ok()?;
     let archived = rkyv::check_archived_root::<ApiSpec>(&bytes).ok()?;
-    archived
-        .deserialize(&mut rkyv::Infallible)
-        .ok()
+    archived.deserialize(&mut rkyv::Infallible).ok()
 }
 
 pub fn save(omadac_id: &str, spec: &ApiSpec) -> Result<()> {
     let path = cache_path(omadac_id).context("Could not resolve home directory")?;
-    std::fs::create_dir_all(path.parent().unwrap())
-        .context("Failed to create cache directory")?;
+    std::fs::create_dir_all(path.parent().unwrap()).context("Failed to create cache directory")?;
 
     let bytes = rkyv::to_bytes::<_, 1024>(spec).context("Failed to serialize spec")?;
 

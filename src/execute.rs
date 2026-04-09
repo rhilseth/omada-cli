@@ -1,12 +1,12 @@
 use anyhow::{Context, Result, anyhow};
-use openapiv3::{OpenAPI, Operation, Parameter, ReferenceOr};
 use std::collections::HashMap;
 
 use crate::auth::Session;
+use crate::model::{ApiOperation, ParamLocation};
 
 /// Convert camelCase param name to kebab-case CLI flag name.
 /// e.g. "siteId" → "site-id", "apMac" → "ap-mac"
-fn camel_to_kebab(s: &str) -> String {
+pub fn camel_to_kebab(s: &str) -> String {
     let mut out = String::new();
     for c in s.chars() {
         if c.is_uppercase() && !out.is_empty() {
@@ -17,60 +17,6 @@ fn camel_to_kebab(s: &str) -> String {
         }
     }
     out
-}
-
-/// Parse `["--site-id", "abc", "--page", "1"]` into a map and optional JSON body.
-pub fn parse_args(raw: &[String]) -> (HashMap<String, String>, Option<String>) {
-    let mut params = HashMap::new();
-    let mut json_body = None;
-    let mut i = 0;
-    while i < raw.len() {
-        if let Some(key) = raw[i].strip_prefix("--") {
-            if i + 1 < raw.len() && !raw[i + 1].starts_with("--") {
-                let value = raw[i + 1].clone();
-                if key == "json" {
-                    json_body = Some(value);
-                } else {
-                    params.insert(key.to_string(), value);
-                }
-                i += 2;
-            } else {
-                i += 1;
-            }
-        } else {
-            i += 1;
-        }
-    }
-    (params, json_body)
-}
-
-fn find_operation<'a>(
-    spec: &'a OpenAPI,
-    operation_id: &str,
-) -> Result<(String, String, &'a Operation)> {
-    for (path, path_ref) in spec.paths.iter() {
-        let ReferenceOr::Item(item) = path_ref else {
-            continue;
-        };
-        let candidates = [
-            ("GET", &item.get),
-            ("POST", &item.post),
-            ("PUT", &item.put),
-            ("PATCH", &item.patch),
-            ("DELETE", &item.delete),
-        ];
-        for (method, op_opt) in candidates {
-            if let Some(op) = op_opt
-                && op.operation_id.as_deref() == Some(operation_id)
-            {
-                return Ok((method.to_string(), path.clone(), op));
-            }
-        }
-    }
-    Err(anyhow!(
-        "Operation '{}' not found. Use `omada list` to see available operations.",
-        operation_id
-    ))
 }
 
 fn substitute_path(
@@ -109,22 +55,17 @@ fn substitute_path(
 }
 
 fn collect_query_params(
-    operation: &Operation,
+    operation: &ApiOperation,
     params: &HashMap<String, String>,
 ) -> Vec<(String, String)> {
     let mut query = Vec::new();
-    for param_ref in &operation.parameters {
-        let ReferenceOr::Item(param) = param_ref else {
+    for param in &operation.parameters {
+        if param.location != ParamLocation::Query {
             continue;
-        };
-        if let Parameter::Query { parameter_data, .. } = param {
-            let flag = camel_to_kebab(&parameter_data.name);
-            if let Some(v) = params
-                .get(&flag)
-                .or_else(|| params.get(&parameter_data.name))
-            {
-                query.push((parameter_data.name.clone(), v.clone()));
-            }
+        }
+        let flag = camel_to_kebab(&param.name);
+        if let Some(v) = params.get(&flag).or_else(|| params.get(&param.name)) {
+            query.push((param.name.clone(), v.clone()));
         }
     }
     query
@@ -133,19 +74,17 @@ fn collect_query_params(
 pub async fn run(
     client: &reqwest::Client,
     session: &Session,
-    spec: &OpenAPI,
-    operation_id: &str,
+    operation: &ApiOperation,
     params: &HashMap<String, String>,
     json_body: Option<&str>,
     base_url: &str,
 ) -> Result<serde_json::Value> {
-    let (method, path_template, operation) = find_operation(spec, operation_id)?;
-    let path = substitute_path(&path_template, session, params)?;
+    let path = substitute_path(&operation.path, session, params)?;
     let url = format!("{base_url}{path}");
     let query = collect_query_params(operation, params);
 
     let mut req = client
-        .request(method.parse()?, &url)
+        .request(operation.method.parse()?, &url)
         .header(
             "Authorization",
             format!("AccessToken={}", session.access_token),
