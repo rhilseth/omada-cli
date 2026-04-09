@@ -57,7 +57,8 @@ async fn main() -> Result<()> {
         }
 
         Command::List { tag } => {
-            let api_spec = spec::fetch(&client, &config.base_url).await?;
+            let openapi = spec::fetch(&client, &config.base_url).await?;
+            let api_spec = spec::convert(&openapi);
             let operations = spec::list_operations(&api_spec);
 
             let ops: Vec<_> = match &tag {
