@@ -61,8 +61,13 @@ fn build_command(spec: &ApiSpec) -> Command {
                 arg = arg.help(s(desc.clone()));
             }
 
-            if param.location == ParamLocation::Path || param.required {
-                arg = arg.required(true);
+            match param.name.as_str() {
+                "page" => arg = arg.default_value("1"),
+                "pageSize" => arg = arg.default_value("20"),
+                _ if param.location == ParamLocation::Path || param.required => {
+                    arg = arg.required(true);
+                }
+                _ => {}
             }
 
             sub = sub.arg(arg);
