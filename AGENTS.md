@@ -13,6 +13,7 @@ The cli expects the following environment variables to be set:
 - `OMADA_CLIENT_ID` — OpenAPI client ID
 - `OMADA_CLIENT_SECRET` — OpenAPI client secret
 
-Use `--insecure` flag when the controller uses a self-signed certificate.
+SSL verification is skipped by default (suits local controllers with self-signed certs).
+Set `OMADA_SSL_VERIFY=true` to enable certificate verification.
 
 

@@ -10,8 +10,7 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> Result<Self> {
         Ok(Self {
-            base_url: std::env::var("OMADA_BASE_URL")
-                .context("OMADA_BASE_URL env var not set")?,
+            base_url: std::env::var("OMADA_BASE_URL").context("OMADA_BASE_URL env var not set")?,
             client_id: std::env::var("OMADA_CLIENT_ID")
                 .context("OMADA_CLIENT_ID env var not set")?,
             client_secret: std::env::var("OMADA_CLIENT_SECRET")

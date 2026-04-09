@@ -8,10 +8,6 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "omada", about = "CLI for Omada controller OpenAPI")]
 struct Cli {
-    /// Accept invalid/self-signed TLS certificates
-    #[arg(long, global = true)]
-    insecure: bool,
-
     #[command(subcommand)]
     command: Command,
 }
@@ -45,8 +41,9 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let config = auth::Config::from_env()?;
 
+    let ssl_verify = std::env::var("OMADA_SSL_VERIFY").as_deref() == Ok("true");
     let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(cli.insecure)
+        .danger_accept_invalid_certs(!ssl_verify)
         .build()?;
 
     match cli.command {

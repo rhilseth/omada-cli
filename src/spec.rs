@@ -50,10 +50,20 @@ pub fn list_operations(spec: &OpenAPI) -> Vec<ApiOperation> {
 
 fn iter_operations(item: &PathItem) -> Vec<(&'static str, &Operation)> {
     let mut ops = Vec::new();
-    if let Some(op) = &item.get    { ops.push(("get",    op)); }
-    if let Some(op) = &item.post   { ops.push(("post",   op)); }
-    if let Some(op) = &item.put    { ops.push(("put",    op)); }
-    if let Some(op) = &item.patch  { ops.push(("patch",  op)); }
-    if let Some(op) = &item.delete { ops.push(("delete", op)); }
+    if let Some(op) = &item.get {
+        ops.push(("get", op));
+    }
+    if let Some(op) = &item.post {
+        ops.push(("post", op));
+    }
+    if let Some(op) = &item.put {
+        ops.push(("put", op));
+    }
+    if let Some(op) = &item.patch {
+        ops.push(("patch", op));
+    }
+    if let Some(op) = &item.delete {
+        ops.push(("delete", op));
+    }
     ops
 }

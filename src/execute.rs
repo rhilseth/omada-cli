@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use openapiv3::{OpenAPI, Operation, Parameter, ReferenceOr};
 use std::collections::HashMap;
 
@@ -49,7 +49,9 @@ fn find_operation<'a>(
     operation_id: &str,
 ) -> Result<(String, String, &'a Operation)> {
     for (path, path_ref) in spec.paths.iter() {
-        let ReferenceOr::Item(item) = path_ref else { continue };
+        let ReferenceOr::Item(item) = path_ref else {
+            continue;
+        };
         let candidates = [
             ("GET", &item.get),
             ("POST", &item.post),
@@ -112,10 +114,15 @@ fn collect_query_params(
 ) -> Vec<(String, String)> {
     let mut query = Vec::new();
     for param_ref in &operation.parameters {
-        let ReferenceOr::Item(param) = param_ref else { continue };
+        let ReferenceOr::Item(param) = param_ref else {
+            continue;
+        };
         if let Parameter::Query { parameter_data, .. } = param {
             let flag = camel_to_kebab(&parameter_data.name);
-            if let Some(v) = params.get(&flag).or_else(|| params.get(&parameter_data.name)) {
+            if let Some(v) = params
+                .get(&flag)
+                .or_else(|| params.get(&parameter_data.name))
+            {
                 query.push((parameter_data.name.clone(), v.clone()));
             }
         }
@@ -152,7 +159,10 @@ pub async fn run(
     }
 
     let resp = req.send().await.context("Request failed")?;
-    let json: serde_json::Value = resp.json().await.context("Failed to parse response as JSON")?;
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .context("Failed to parse response as JSON")?;
 
     Ok(json)
 }
