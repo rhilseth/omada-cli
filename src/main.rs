@@ -50,6 +50,9 @@ fn build_command(spec: &ApiSpec) -> Command {
         let mut sub = Command::new(op_id).about(about);
 
         for param in &op.parameters {
+            if param.name == "omadacId" {
+                continue;
+            }
             let flag = s(execute::camel_to_kebab(&param.name));
             let value_name = s(param.name.to_uppercase());
             let mut arg = Arg::new(flag).long(flag).value_name(value_name);
@@ -103,7 +106,10 @@ async fn main() -> Result<()> {
         .danger_accept_invalid_certs(!ssl_verify)
         .build()?;
 
-    let omadac_id = auth::get_omadac_id(&client, &config.base_url).await?;
+    let omadac_id = match cache::find_omadac_id() {
+        Some(id) => id,
+        None => auth::get_omadac_id(&client, &config.base_url).await?,
+    };
     let api_spec = get_or_fetch_spec(&client, &config.base_url, &omadac_id).await?;
 
     let matches = build_command(&api_spec).get_matches();
@@ -163,6 +169,9 @@ async fn main() -> Result<()> {
 
             let mut params = HashMap::new();
             for param in &op.parameters {
+                if param.name == "omadacId" {
+                    continue;
+                }
                 let flag = execute::camel_to_kebab(&param.name);
                 if let Some(val) = sub_m.get_one::<String>(&flag) {
                     params.insert(flag, val.clone());

@@ -12,6 +12,18 @@ fn cache_path(omadac_id: &str) -> Option<PathBuf> {
     Some(path)
 }
 
+pub fn find_omadac_id() -> Option<String> {
+    let mut base = dirs::home_dir()?;
+    base.push(".omadacli");
+    for entry in std::fs::read_dir(&base).ok()?.flatten() {
+        let path = entry.path();
+        if path.is_dir() && path.join("spec.rkyv").exists() {
+            return entry.file_name().into_string().ok();
+        }
+    }
+    None
+}
+
 pub fn load(omadac_id: &str) -> Option<ApiSpec> {
     let path = cache_path(omadac_id)?;
     let bytes = std::fs::read(&path).ok()?;
