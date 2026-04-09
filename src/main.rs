@@ -1,5 +1,6 @@
 mod auth;
 mod execute;
+mod model;
 mod spec;
 
 use anyhow::Result;
