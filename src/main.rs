@@ -1,4 +1,5 @@
 mod auth;
+mod cache;
 mod execute;
 mod model;
 mod spec;
