@@ -59,7 +59,7 @@ struct OmadaResponse<T> {
     result: Option<T>,
 }
 
-async fn get_controller_id(client: &reqwest::Client, base_url: &str) -> Result<String> {
+pub async fn get_omadac_id(client: &reqwest::Client, base_url: &str) -> Result<String> {
     let url = format!("{base_url}/api/info");
     let resp: OmadaResponse<ControllerInfo> = client
         .get(&url)
@@ -84,7 +84,7 @@ async fn get_controller_id(client: &reqwest::Client, base_url: &str) -> Result<S
 }
 
 pub async fn authenticate(client: &reqwest::Client, config: &Config) -> Result<Session> {
-    let omadac_id = get_controller_id(client, &config.base_url).await?;
+    let omadac_id = get_omadac_id(client, &config.base_url).await?;
 
     let url = format!("{}/openapi/authorize/token", config.base_url);
     let body = TokenRequest {

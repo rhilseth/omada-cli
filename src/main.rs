@@ -6,6 +6,7 @@ mod spec;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use model::ApiSpec;
 
 #[derive(Parser)]
 #[command(name = "omada", about = "CLI for Omada controller OpenAPI")]
@@ -36,6 +37,32 @@ enum Command {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+
+    /// Manage the cached API spec
+    Spec {
+        #[command(subcommand)]
+        command: SpecCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum SpecCommand {
+    /// Delete the cached spec and re-fetch from the controller
+    Refresh,
+}
+
+async fn get_or_fetch_spec(
+    client: &reqwest::Client,
+    base_url: &str,
+    omadac_id: &str,
+) -> Result<ApiSpec> {
+    if let Some(cached) = cache::load(omadac_id) {
+        return Ok(cached);
+    }
+    let openapi = spec::fetch(client, base_url).await?;
+    let api_spec = spec::convert(&openapi);
+    cache::save(omadac_id, &api_spec)?;
+    Ok(api_spec)
 }
 
 #[tokio::main]
@@ -58,8 +85,8 @@ async fn main() -> Result<()> {
         }
 
         Command::List { tag } => {
-            let openapi = spec::fetch(&client, &config.base_url).await?;
-            let api_spec = spec::convert(&openapi);
+            let omadac_id = auth::get_omadac_id(&client, &config.base_url).await?;
+            let api_spec = get_or_fetch_spec(&client, &config.base_url, &omadac_id).await?;
             let operations = spec::list_operations(&api_spec);
 
             let ops: Vec<_> = match &tag {
@@ -84,13 +111,13 @@ async fn main() -> Result<()> {
 
         Command::Run { operation_id, args } => {
             let session = auth::authenticate(&client, &config).await?;
-            let api_spec = spec::fetch(&client, &config.base_url).await?;
+            let openapi = spec::fetch(&client, &config.base_url).await?;
             let (params, json_body) = execute::parse_args(&args);
 
             let result = execute::run(
                 &client,
                 &session,
-                &api_spec,
+                &openapi,
                 &operation_id,
                 &params,
                 json_body.as_deref(),
@@ -99,6 +126,18 @@ async fn main() -> Result<()> {
             .await?;
 
             println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+
+        Command::Spec {
+            command: SpecCommand::Refresh,
+        } => {
+            let omadac_id = auth::get_omadac_id(&client, &config.base_url).await?;
+            cache::delete(&omadac_id)?;
+            println!("Fetching spec from controller...");
+            let openapi = spec::fetch(&client, &config.base_url).await?;
+            let api_spec = spec::convert(&openapi);
+            cache::save(&omadac_id, &api_spec)?;
+            println!("Spec cached ({} operations).", api_spec.operations.len());
         }
     }
 
