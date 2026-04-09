@@ -15,6 +15,13 @@ fn s(string: String) -> &'static str {
 }
 
 fn build_command(spec: &ApiSpec) -> Command {
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let default_end = s(now_secs.to_string());
+    let default_start = s(now_secs.saturating_sub(86_400).to_string());
+
     let mut cmd = Command::new("omada")
         .about("CLI for Omada controller OpenAPI")
         .subcommand_required(true)
@@ -64,6 +71,8 @@ fn build_command(spec: &ApiSpec) -> Command {
             match param.name.as_str() {
                 "page" => arg = arg.default_value("1"),
                 "pageSize" => arg = arg.default_value("20"),
+                "start" => arg = arg.default_value(default_start),
+                "end" => arg = arg.default_value(default_end),
                 _ if param.location == ParamLocation::Path || param.required => {
                     arg = arg.required(true);
                 }
