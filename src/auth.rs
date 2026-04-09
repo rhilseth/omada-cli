@@ -20,6 +20,15 @@ impl Config {
     }
 }
 
+pub struct Session {
+    pub access_token: String,
+    pub token_type: String,
+    pub expires_in: u64,
+    pub omadac_id: String,
+    #[allow(dead_code)]
+    pub refresh_token: Option<String>,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ControllerInfo {
@@ -34,14 +43,13 @@ struct TokenRequest<'a> {
     client_secret: &'a str,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AccessToken {
-    pub access_token: String,
-    pub token_type: String,
-    pub expires_in: u64,
-    #[allow(dead_code)]
-    pub refresh_token: Option<String>,
+struct AccessToken {
+    access_token: String,
+    token_type: String,
+    expires_in: u64,
+    refresh_token: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -76,7 +84,7 @@ async fn get_controller_id(client: &reqwest::Client, base_url: &str) -> Result<S
         .context("Controller info missing result field")
 }
 
-pub async fn authenticate(client: &reqwest::Client, config: &Config) -> Result<AccessToken> {
+pub async fn authenticate(client: &reqwest::Client, config: &Config) -> Result<Session> {
     let omadac_id = get_controller_id(client, &config.base_url).await?;
 
     let url = format!("{}/openapi/authorize/token", config.base_url);
@@ -105,5 +113,12 @@ pub async fn authenticate(client: &reqwest::Client, config: &Config) -> Result<A
         );
     }
 
-    resp.result.context("Token response missing result field")
+    let token = resp.result.context("Token response missing result field")?;
+    Ok(Session {
+        access_token: token.access_token,
+        token_type: token.token_type,
+        expires_in: token.expires_in,
+        omadac_id,
+        refresh_token: token.refresh_token,
+    })
 }

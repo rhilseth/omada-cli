@@ -1,6 +1,6 @@
 Project Overview
 
-omada is a Rust CLI tool for interacting with Omada controller Openapi. It dynamically generates its command surface at runtime by parsing the Omada Openapi spec of a controller at runtime.
+omada is a Rust CLI tool for interacting with Omada controller Openapi. It dynamically generates its command surface at runtime by parsing the Omada Openapi spec of a controller at runtime using clap.
 
 Build & Test
 
