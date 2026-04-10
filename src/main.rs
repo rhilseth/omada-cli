@@ -50,6 +50,16 @@ fn build_command(spec: &ApiSpec) -> Command {
                     Command::new("refresh")
                         .about("Delete the cached spec and re-fetch from the controller"),
                 ),
+        )
+        .subcommand(
+            Command::new("sites")
+                .about("Manage the cached site list")
+                .subcommand_required(true)
+                .arg_required_else_help(true)
+                .subcommand(
+                    Command::new("refresh")
+                        .about("Delete the cached site list and re-fetch from the controller"),
+                ),
         );
 
     for op in &spec.operations {
@@ -186,6 +196,20 @@ async fn main() -> Result<()> {
                 let fresh = spec::convert(&openapi);
                 cache::save(&omadac_id, &fresh)?;
                 println!("Spec cached ({} operations).", fresh.operations.len());
+            }
+        }
+
+        Some(("sites", sub_m)) => {
+            if let Some(("refresh", _)) = sub_m.subcommand() {
+                cache::delete_sites(&omadac_id)?;
+                let session = auth::authenticate(&client, &config).await?;
+                let site_list =
+                    sites::get_or_fetch(&client, &session, &api_spec, &omadac_id, &config.base_url)
+                        .await?;
+                println!("Sites cached ({} site(s)).", site_list.len());
+                for s in &site_list {
+                    println!("  {} — {}", s.name, s.id);
+                }
             }
         }
 

@@ -70,6 +70,15 @@ pub fn save_sites(omadac_id: &str, sites: &SiteList) -> Result<()> {
     Ok(())
 }
 
+pub fn delete_sites(omadac_id: &str) -> Result<()> {
+    if let Some(path) = sites_path(omadac_id)
+        && path.exists()
+    {
+        std::fs::remove_file(&path).context("Failed to delete sites cache file")?;
+    }
+    Ok(())
+}
+
 pub fn delete(omadac_id: &str) -> Result<()> {
     if let Some(path) = cache_path(omadac_id)
         && path.exists()
