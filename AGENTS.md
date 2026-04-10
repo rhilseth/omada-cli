@@ -1,21 +1,86 @@
-Project Overview
+# omada-cli
 
-omada is a Rust CLI tool for interacting with Omada controller Openapi. It dynamically generates its command surface at runtime by parsing the Omada Openapi spec of a controller at runtime using clap.
+A Rust CLI for the Omada controller OpenAPI. Instead of hard-coding commands,
+it fetches the controller's OpenAPI spec at startup and generates a clap
+command tree from it — every operation in the spec becomes a subcommand with
+flags derived from its parameters.
 
-Build & Test
+## Architecture
 
-cargo build                     # Build in dev mode
-cargo clippy -- -D warnings     # Lint check
-cargo test                      # Run tests
+- **`src/main.rs`** — Entry point. Builds the clap command tree from the
+  cached spec, dispatches to the selected operation, and handles the built-in
+  subcommands (`auth`, `list`, `spec refresh`, `sites refresh`).
+- **`src/spec.rs`** — Fetches the OpenAPI document from the controller and
+  converts it into the internal `ApiSpec` model.
+- **`src/model.rs`** — Data types (`ApiSpec`, `ApiOperation`, `ApiParam`,
+  `CachedSite`, `SiteList`). All derive rkyv traits for zero-copy caching.
+- **`src/cache.rs`** — rkyv-backed disk cache at
+  `~/.omadacli/<omadacId>/{spec,sites}.rkyv`. The `omadacId` is recovered from
+  the directory name on startup, so a cached run makes zero network calls
+  before dispatch.
+- **`src/auth.rs`** — `GET /api/info` → `omadacId`, then
+  `POST /openapi/authorize/token` → access token. Sends
+  `Authorization: AccessToken=<token>` on subsequent requests.
+- **`src/sites.rs`** — Fetches and caches the site list so `--site <NAME>` can
+  be resolved to a `siteId` offline.
+- **`src/execute.rs`** — Substitutes path params, collects query params, and
+  performs the HTTP request for a given operation.
 
-Always run `cargo fmt` and `cargo clippy -- -D warnings` after making changes. Both must pass cleanly before considering work done.
+### Generated-command conveniences
 
-The cli expects the following environment variables to be set:
-- `OMADA_BASE_URL` — base URL of the Omada controller (e.g. `https://192.168.1.1:8043`)
+When building the command tree, a few parameters get special treatment:
+
+- `omadacId` is hidden — always injected from the session.
+- `page` defaults to `1`, `pageSize` to `20`.
+- `start` / `end` (Unix seconds) default to "24 hours ago" / "now".
+- `siteId` is never required. If omitted, the CLI uses `--site <NAME>`,
+  the sole site, or a site named `Default`, in that order.
+
+## Build & test
+
+```sh
+cargo build                    # dev build
+cargo fmt                      # format
+cargo clippy -- -D warnings    # lint
+cargo test                     # run tests
+```
+
+Always run `cargo fmt` and `cargo clippy -- -D warnings` after making changes.
+Both must pass cleanly before considering work done.
+
+## Configuration
+
+The CLI reads these environment variables:
+
+- `OMADA_BASE_URL` — base URL of the controller (e.g. `https://192.168.1.1:8043`)
 - `OMADA_CLIENT_ID` — OpenAPI client ID
 - `OMADA_CLIENT_SECRET` — OpenAPI client secret
+- `OMADA_SSL_VERIFY` — set to `true` to enable TLS cert verification
+  (default: skipped, which suits local controllers with self-signed certs)
 
-SSL verification is skipped by default (suits local controllers with self-signed certs).
-Set `OMADA_SSL_VERIFY=true` to enable certificate verification.
+## Usage examples
 
+```sh
+# Verify credentials and show controller info
+omada auth
 
+# List every operation the spec exposes, optionally filtered by tag
+omada list
+omada list --tag Device
+
+# Refresh the cached OpenAPI spec or site list
+omada spec refresh
+omada sites refresh
+
+# Call an operation — flags come from the spec
+omada getTop5Aps                       # auto-resolves siteId (Default / sole site)
+omada getTop5Aps --site Default        # pick by name
+omada getTop5Aps --site-id 63f794...   # pick by raw id
+
+# Pagination and time-range defaults are applied automatically
+omada getClients                       # page=1, pageSize=20
+omada getClientStats --start 1700000000 --end 1700086400
+
+# Operations with a request body take --json
+omada createSomething --json '{"name":"foo"}'
+```
