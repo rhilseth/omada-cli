@@ -87,9 +87,7 @@ fn build_command(spec: &ApiSpec) -> Command {
                 "end" => arg = arg.default_value(default_end),
                 "siteId" => {
                     has_site_id = true;
-                    if param.location == ParamLocation::Path || param.required {
-                        arg = arg.required_unless_present("site");
-                    }
+                    // Never required: auto-resolved from site list if omitted
                 }
                 _ if param.location == ParamLocation::Path || param.required => {
                     arg = arg.required(true);
@@ -233,28 +231,38 @@ async fn main() -> Result<()> {
                 }
             }
 
-            // Resolve --site name to --site-id if provided and site-id not already set
+            // Resolve site-id: explicit --site-id > --site name > auto-detect from site list
             let has_site_id_param = op.parameters.iter().any(|p| p.name == "siteId");
-            let site_name_arg = has_site_id_param
-                .then(|| sub_m.get_one::<String>("site"))
-                .flatten();
-            if let Some(site_name) = site_name_arg
-                && !params.contains_key("site-id")
-            {
+            if has_site_id_param && !params.contains_key("site-id") {
                 let site_list =
                     sites::get_or_fetch(&client, &session, &api_spec, &omadac_id, &config.base_url)
                         .await?;
-                let site = site_list
+                let site = if let Some(name) = sub_m.get_one::<String>("site") {
+                    site_list
+                        .iter()
+                        .find(|s| s.name.eq_ignore_ascii_case(name))
+                        .ok_or_else(|| {
+                            let names: Vec<_> = site_list.iter().map(|s| s.name.as_str()).collect();
+                            anyhow::anyhow!(
+                                "Site '{}' not found. Available: {}",
+                                name,
+                                names.join(", ")
+                            )
+                        })?
+                } else if site_list.len() == 1 {
+                    &site_list[0]
+                } else if let Some(s) = site_list
                     .iter()
-                    .find(|s| s.name.eq_ignore_ascii_case(site_name))
-                    .ok_or_else(|| {
-                        let names: Vec<_> = site_list.iter().map(|s| s.name.as_str()).collect();
-                        anyhow::anyhow!(
-                            "Site '{}' not found. Available: {}",
-                            site_name,
-                            names.join(", ")
-                        )
-                    })?;
+                    .find(|s| s.name.eq_ignore_ascii_case("Default"))
+                {
+                    s
+                } else {
+                    let names: Vec<_> = site_list.iter().map(|s| s.name.as_str()).collect();
+                    anyhow::bail!(
+                        "Multiple sites found; specify --site-id or --site. Available: {}",
+                        names.join(", ")
+                    );
+                };
                 params.insert("site-id".to_string(), site.id.clone());
             }
 
