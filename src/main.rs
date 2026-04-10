@@ -16,13 +16,55 @@ fn s(string: String) -> &'static str {
     Box::leak(string.into_boxed_str())
 }
 
+/// Returns true when the parameter description indicates millisecond timestamps.
+fn param_uses_ms(description: &Option<String>) -> bool {
+    description.as_deref().is_some_and(|d| {
+        d.contains("unit: ms") || d.contains("unit:ms") || d.contains("millisecond")
+    })
+}
+
+/// Resolve a `--start` / `--end` value into the right unit (seconds or ms).
+///
+/// Accepted forms:
+///   `now`          → current time
+///   `<N>m`         → N minutes ago
+///   `<N>h`         → N hours ago
+///   `<N>d`         → N days ago
+///   `<N>w`         → N weeks ago
+///   raw integer    → passed through unchanged (caller's responsibility)
+fn resolve_time(value: &str, use_ms: bool) -> anyhow::Result<String> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let offset_secs: Option<u64> = match value {
+        "now" => Some(0),
+        v if v.ends_with('m') => v[..v.len() - 1].parse::<u64>().ok().map(|n| n * 60),
+        v if v.ends_with('h') => v[..v.len() - 1].parse::<u64>().ok().map(|n| n * 3_600),
+        v if v.ends_with('d') => v[..v.len() - 1].parse::<u64>().ok().map(|n| n * 86_400),
+        v if v.ends_with('w') => v[..v.len() - 1].parse::<u64>().ok().map(|n| n * 7 * 86_400),
+        _ => None,
+    };
+
+    match offset_secs {
+        Some(offset) => {
+            let ts = now.saturating_sub(offset);
+            Ok(if use_ms {
+                (ts * 1_000).to_string()
+            } else {
+                ts.to_string()
+            })
+        }
+        None => Ok(value.to_string()), // raw integer — pass through
+    }
+}
+
 fn build_command(spec: &ApiSpec) -> Command {
     let now_secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    let default_end = s(now_secs.to_string());
-    let default_start = s(now_secs.saturating_sub(86_400).to_string());
 
     let mut cmd = Command::new("omada")
         .about("CLI for Omada controller OpenAPI")
@@ -93,8 +135,23 @@ fn build_command(spec: &ApiSpec) -> Command {
             match param.name.as_str() {
                 "page" => arg = arg.default_value("1"),
                 "pageSize" => arg = arg.default_value("20"),
-                "start" => arg = arg.default_value(default_start),
-                "end" => arg = arg.default_value(default_end),
+                "start" => {
+                    let use_ms = param_uses_ms(&param.description);
+                    let v = now_secs.saturating_sub(86_400);
+                    arg = arg.default_value(s(if use_ms {
+                        (v * 1_000).to_string()
+                    } else {
+                        v.to_string()
+                    }));
+                }
+                "end" => {
+                    let use_ms = param_uses_ms(&param.description);
+                    arg = arg.default_value(s(if use_ms {
+                        (now_secs * 1_000).to_string()
+                    } else {
+                        now_secs.to_string()
+                    }));
+                }
                 "siteId" => {
                     has_site_id = true;
                     // Never required: auto-resolved from site list if omitted
@@ -330,6 +387,18 @@ async fn main() -> Result<()> {
                 let flag = execute::camel_to_kebab(&param.name);
                 if let Some(val) = sub_m.get_one::<String>(&flag) {
                     params.insert(flag, val.clone());
+                }
+            }
+
+            // Resolve relative time strings (e.g. "7d", "24h") for start/end params
+            for param in &op.parameters {
+                if !matches!(param.name.as_str(), "start" | "end") {
+                    continue;
+                }
+                let flag = execute::camel_to_kebab(&param.name);
+                if let Some(val) = params.get(&flag).cloned() {
+                    let use_ms = param_uses_ms(&param.description);
+                    params.insert(flag, resolve_time(&val, use_ms)?);
                 }
             }
 

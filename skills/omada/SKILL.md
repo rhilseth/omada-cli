@@ -44,7 +44,7 @@ These save flags and should be relied on — don't pass values for these unless 
 
 - **Pagination** — `--page` defaults to `1`, `--page-size` to `20`. Override if the user asks for more/different pages.
 
-- **Time ranges** — `--start` and `--end` are Unix seconds and default to "24 hours ago" / "now" respectively. Override to query historical windows.
+- **Time ranges** — `--start` and `--end` default to "24 hours ago" / "now". They accept relative shorthands: `now`, `Nm` (N minutes ago), `Nh` (N hours ago), `Nd` (N days ago), `Nw` (N weeks ago), or a raw integer timestamp. The CLI auto-detects whether the operation wants seconds or milliseconds from the spec — you never need to do unit conversion or shell arithmetic.
 
 - **`omadacId`** — injected automatically from the session. Never pass it as a flag; it's hidden from the CLI surface.
 
@@ -74,7 +74,8 @@ omada schema createSite
 # Run operations — siteId is auto-resolved
 omada getGridActiveClients
 omada getGridActiveClients --site Office
-omada getTop5Aps --start 1700000000 --end 1700086400
+omada getTop5Aps --start 7d               # 7 days ago to now
+omada getClientTimeline --client-mac "AA-BB-CC-DD-EE-FF" --type 2 --start 7d
 
 # Write operations use --json; check the schema first
 omada schema createSite

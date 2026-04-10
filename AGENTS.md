@@ -35,7 +35,10 @@ When building the command tree, a few parameters get special treatment:
 
 - `omadacId` is hidden — always injected from the session.
 - `page` defaults to `1`, `pageSize` to `20`.
-- `start` / `end` (Unix seconds) default to "24 hours ago" / "now".
+- `start` / `end` default to "24 hours ago" / "now". Both accept relative
+  shorthands (`now`, `Nm`, `Nh`, `Nd`, `Nw`) in addition to raw integers.
+  The unit (seconds vs milliseconds) is auto-detected from the parameter
+  description in the spec — no manual conversion needed.
 - `siteId` is never required. If omitted, the CLI uses `--site <NAME>`,
   the sole site, or a site named `Default`, in that order.
 
@@ -122,7 +125,8 @@ omada getTop5Aps --site-id 63f794...   # pick by raw id
 
 # Pagination and time-range defaults are applied automatically
 omada getClients                       # page=1, pageSize=20
-omada getClientStats --start 1700000000 --end 1700086400
+omada getClientStats --start 7d            # last 7 days
+omada getClientStats --start 24h           # last 24 hours (explicit)
 
 # Operations with a request body take --json
 omada createSomething --json '{"name":"foo"}'

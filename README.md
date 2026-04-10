@@ -60,7 +60,7 @@ omada getTop5Aps --site-id 63f794...   # pick site by raw id
 
 # Pagination and time-range defaults are applied automatically
 omada getClients                       # page=1, pageSize=20
-omada getClientStats --start 1700000000 --end 1700086400
+omada getClientStats --start 7d            # relative: 7 days ago to now
 
 # Operations with a request body take --json
 omada createSomething --json '{"name":"foo"}'
@@ -81,7 +81,7 @@ omada sites refresh
 ### Defaults
 
 - `page` → `1`, `pageSize` → `20`
-- `start` / `end` → 24 hours ago / now (Unix seconds)
+- `start` / `end` → 24 hours ago / now. Accept relative shorthands: `now`, `Nm` (minutes), `Nh` (hours), `Nd` (days), `Nw` (weeks), or a raw integer timestamp. The unit (seconds vs milliseconds) is detected automatically from the spec.
 - `omadacId` is injected automatically from the cached session
 
 ## Agent skill
