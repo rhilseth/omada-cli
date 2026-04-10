@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use rkyv::Deserialize;
 use std::path::PathBuf;
 
-use crate::model::ApiSpec;
+use crate::model::{ApiSpec, SiteList};
 
 fn cache_path(omadac_id: &str) -> Option<PathBuf> {
     let mut path = dirs::home_dir()?;
@@ -42,6 +42,31 @@ pub fn save(omadac_id: &str, spec: &ApiSpec) -> Result<()> {
     std::fs::write(&tmp, &bytes).context("Failed to write cache temp file")?;
     std::fs::rename(&tmp, &path).context("Failed to rename cache file")?;
 
+    Ok(())
+}
+
+fn sites_path(omadac_id: &str) -> Option<PathBuf> {
+    let mut path = dirs::home_dir()?;
+    path.push(".omadacli");
+    path.push(omadac_id);
+    path.push("sites.rkyv");
+    Some(path)
+}
+
+pub fn load_sites(omadac_id: &str) -> Option<SiteList> {
+    let path = sites_path(omadac_id)?;
+    let bytes = std::fs::read(&path).ok()?;
+    let archived = rkyv::check_archived_root::<SiteList>(&bytes).ok()?;
+    archived.deserialize(&mut rkyv::Infallible).ok()
+}
+
+pub fn save_sites(omadac_id: &str, sites: &SiteList) -> Result<()> {
+    let path = sites_path(omadac_id).context("Could not resolve home directory")?;
+    std::fs::create_dir_all(path.parent().unwrap()).context("Failed to create cache directory")?;
+    let bytes = rkyv::to_bytes::<_, 256>(sites).context("Failed to serialize sites")?;
+    let tmp = path.with_extension("rkyv.tmp");
+    std::fs::write(&tmp, &bytes).context("Failed to write sites temp file")?;
+    std::fs::rename(&tmp, &path).context("Failed to rename sites cache file")?;
     Ok(())
 }
 

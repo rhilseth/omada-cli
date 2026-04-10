@@ -34,3 +34,16 @@ pub enum ParamLocation {
     Path,
     Query,
 }
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug)]
+#[archive(check_bytes)]
+pub struct CachedSite {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug)]
+#[archive(check_bytes)]
+pub struct SiteList {
+    pub sites: Vec<CachedSite>,
+}

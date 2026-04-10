@@ -2,6 +2,7 @@ mod auth;
 mod cache;
 mod execute;
 mod model;
+mod sites;
 mod spec;
 
 use anyhow::Result;
@@ -55,6 +56,7 @@ fn build_command(spec: &ApiSpec) -> Command {
         let op_id = s(op.operation_id.clone());
         let about = s(op.summary.clone().unwrap_or_default());
         let mut sub = Command::new(op_id).about(about);
+        let mut has_site_id = false;
 
         for param in &op.parameters {
             if param.name == "omadacId" {
@@ -73,6 +75,12 @@ fn build_command(spec: &ApiSpec) -> Command {
                 "pageSize" => arg = arg.default_value("20"),
                 "start" => arg = arg.default_value(default_start),
                 "end" => arg = arg.default_value(default_end),
+                "siteId" => {
+                    has_site_id = true;
+                    if param.location == ParamLocation::Path || param.required {
+                        arg = arg.required_unless_present("site");
+                    }
+                }
                 _ if param.location == ParamLocation::Path || param.required => {
                     arg = arg.required(true);
                 }
@@ -80,6 +88,15 @@ fn build_command(spec: &ApiSpec) -> Command {
             }
 
             sub = sub.arg(arg);
+        }
+
+        if has_site_id {
+            sub = sub.arg(
+                Arg::new("site")
+                    .long("site")
+                    .value_name("SITE_NAME")
+                    .help("Site name (alternative to --site-id; looked up from cache)"),
+            );
         }
 
         if op.has_request_body {
@@ -191,6 +208,32 @@ async fn main() -> Result<()> {
                     params.insert(flag, val.clone());
                 }
             }
+
+            // Resolve --site name to --site-id if provided and site-id not already set
+            let has_site_id_param = op.parameters.iter().any(|p| p.name == "siteId");
+            let site_name_arg = has_site_id_param
+                .then(|| sub_m.get_one::<String>("site"))
+                .flatten();
+            if let Some(site_name) = site_name_arg
+                && !params.contains_key("site-id")
+            {
+                let site_list =
+                    sites::get_or_fetch(&client, &session, &api_spec, &omadac_id, &config.base_url)
+                        .await?;
+                let site = site_list
+                    .iter()
+                    .find(|s| s.name.eq_ignore_ascii_case(site_name))
+                    .ok_or_else(|| {
+                        let names: Vec<_> = site_list.iter().map(|s| s.name.as_str()).collect();
+                        anyhow::anyhow!(
+                            "Site '{}' not found. Available: {}",
+                            site_name,
+                            names.join(", ")
+                        )
+                    })?;
+                params.insert("site-id".to_string(), site.id.clone());
+            }
+
             let json_body = op
                 .has_request_body
                 .then(|| sub_m.get_one::<String>("json").cloned())
