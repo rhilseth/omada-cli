@@ -9,8 +9,17 @@ description: Use the `omada` CLI to query an Omada network controller's OpenAPI 
 
 ## Prerequisites
 
-The user must have these environment variables set in their shell:
+Credentials can be configured via a config file or environment variables. The config file approach is simpler and recommended:
 
+**Config file (recommended):**
+```sh
+omada config --base-url https://192.168.1.1:8043 \
+             --client-id <ID> \
+             --client-secret <SECRET>
+```
+This writes to `~/.omadacli/config.toml` (mode `0600`). Pass `--ssl-verify` to enable TLS cert verification (omit for controllers with self-signed certs).
+
+**Environment variables (override the config file):**
 - `OMADA_BASE_URL` — e.g. `https://192.168.1.1:8043`
 - `OMADA_CLIENT_ID`
 - `OMADA_CLIENT_SECRET`
@@ -60,6 +69,9 @@ The spec and site list are cached at `~/.omadacli/<omadacId>/{spec,sites}.rkyv` 
 ## Examples
 
 ```sh
+# Save credentials to ~/.omadacli/config.toml
+omada config --base-url https://192.168.1.1:8043 --client-id <ID> --client-secret <SECRET>
+
 # Sanity-check credentials and show controller info
 omada auth
 
