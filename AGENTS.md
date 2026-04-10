@@ -8,6 +8,8 @@ cargo build                     # Build in dev mode
 cargo clippy -- -D warnings     # Lint check
 cargo test                      # Run tests
 
+Always run `cargo fmt` and `cargo clippy -- -D warnings` after making changes. Both must pass cleanly before considering work done.
+
 The cli expects the following environment variables to be set:
 - `OMADA_BASE_URL` — base URL of the Omada controller (e.g. `https://192.168.1.1:8043`)
 - `OMADA_CLIENT_ID` — OpenAPI client ID
