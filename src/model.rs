@@ -16,6 +16,8 @@ pub struct ApiOperation {
     pub tag: Option<String>,
     pub parameters: Vec<ApiParam>,
     pub has_request_body: bool,
+    /// Resolved JSON schema for the request body (pretty-printed), if any.
+    pub request_body_schema: Option<String>,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug)]

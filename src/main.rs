@@ -60,6 +60,15 @@ fn build_command(spec: &ApiSpec) -> Command {
                     Command::new("refresh")
                         .about("Delete the cached site list and re-fetch from the controller"),
                 ),
+        )
+        .subcommand(
+            Command::new("schema")
+                .about("Show the parameters and request-body schema for an operation")
+                .arg(
+                    Arg::new("operation")
+                        .required(true)
+                        .help("Operation ID (e.g. createSomething)"),
+                ),
         );
 
     for op in &spec.operations {
@@ -194,6 +203,49 @@ async fn main() -> Result<()> {
                 let fresh = spec::convert(&openapi);
                 cache::save(&omadac_id, &fresh)?;
                 println!("Spec cached ({} operations).", fresh.operations.len());
+            }
+        }
+
+        Some(("schema", sub_m)) => {
+            let op_id = sub_m.get_one::<String>("operation").unwrap();
+            let op = api_spec
+                .operations
+                .iter()
+                .find(|op| &op.operation_id == op_id)
+                .ok_or_else(|| anyhow::anyhow!("Unknown operation: {op_id}"))?;
+
+            println!("{} {}", op.method, op.path);
+            if let Some(summary) = &op.summary {
+                println!("{summary}");
+            }
+
+            let visible_params: Vec<_> = op
+                .parameters
+                .iter()
+                .filter(|p| p.name != "omadacId")
+                .collect();
+            if !visible_params.is_empty() {
+                println!("\nParameters:");
+                for p in &visible_params {
+                    let loc = match p.location {
+                        ParamLocation::Path => "path",
+                        ParamLocation::Query => "query",
+                    };
+                    let req = if p.required { ", required" } else { "" };
+                    let flag = execute::camel_to_kebab(&p.name);
+                    print!("  --{flag} [{loc}{req}]");
+                    if let Some(desc) = &p.description {
+                        print!(" — {desc}");
+                    }
+                    println!();
+                }
+            }
+
+            if let Some(schema) = &op.request_body_schema {
+                println!("\nRequest body (JSON schema):");
+                println!("{schema}");
+            } else if op.has_request_body {
+                println!("\nRequest body: (schema not available)");
             }
         }
 

@@ -9,9 +9,10 @@ flags derived from its parameters.
 
 - **`src/main.rs`** — Entry point. Builds the clap command tree from the
   cached spec, dispatches to the selected operation, and handles the built-in
-  subcommands (`auth`, `list`, `spec refresh`, `sites refresh`).
+  subcommands (`auth`, `list`, `schema`, `spec refresh`, `sites refresh`).
 - **`src/spec.rs`** — Fetches the OpenAPI document from the controller and
-  converts it into the internal `ApiSpec` model.
+  converts it into the internal `ApiSpec` model. Also resolves `$ref` pointers
+  to produce a fully-inlined JSON schema per operation, stored in the cache.
 - **`src/model.rs`** — Data types (`ApiSpec`, `ApiOperation`, `ApiParam`,
   `CachedSite`, `SiteList`). All derive rkyv traits for zero-copy caching.
 - **`src/cache.rs`** — rkyv-backed disk cache at
@@ -83,4 +84,9 @@ omada getClientStats --start 1700000000 --end 1700086400
 
 # Operations with a request body take --json
 omada createSomething --json '{"name":"foo"}'
+
+# Show the schema for an operation — lists parameters and the request-body
+# JSON schema (with $refs inlined) so you know exactly what to pass
+omada schema createSomething
+omada schema getTop5Aps
 ```
