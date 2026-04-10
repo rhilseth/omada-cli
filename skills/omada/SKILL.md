@@ -25,8 +25,6 @@ This writes to `~/.omadacli/config.toml` (mode `0600`). Pass `--ssl-verify` to e
 - `OMADA_CLIENT_SECRET`
 - `OMADA_SSL_VERIFY` *(optional)* — set to `true` to enable TLS cert verification. Defaults to skipped, which suits local controllers with self-signed certs.
 
-If the `omada` binary is not on PATH, build it with `cargo build --release` from the omada-cli repo and invoke `./target/release/omada`, or install globally with `cargo install --path .`.
-
 ## Workflow for any Omada task
 
 Always follow this discover → inspect → invoke loop. Do not guess operation IDs or flag names — the spec is the source of truth.
