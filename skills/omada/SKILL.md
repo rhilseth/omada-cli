@@ -44,7 +44,7 @@ These save flags and should be relied on — don't pass values for these unless 
 
 - **Pagination** — `--page` defaults to `1`, `--page-size` to `20`. Override if the user asks for more/different pages.
 
-- **Time ranges** — `--start` and `--end` default to "24 hours ago" / "now". They accept relative shorthands: `now`, `Nm` (N minutes ago), `Nh` (N hours ago), `Nd` (N days ago), `Nw` (N weeks ago), or a raw integer timestamp. The CLI auto-detects whether the operation wants seconds or milliseconds from the spec — you never need to do unit conversion or shell arithmetic.
+- **Time ranges** — `--start` and `--end` default to "24 hours ago" / "now". They accept relative shorthands: `now`, `Nm` (N minutes ago), `Nh` (N hours ago), `Nd` (N days ago), `Nw` (N weeks ago), or a raw integer timestamp. The CLI auto-detects whether the operation wants seconds or milliseconds from the spec — you never need to do unit conversion or shell arithmetic. This relative-shorthand resolution also applies to any parameter whose name ends in `Start` or `End` (e.g. `--filters.time-start`, `--filters.time-end`).
 
 - **`omadacId`** — injected automatically from the session. Never pass it as a flag; it's hidden from the CLI surface.
 
@@ -93,6 +93,8 @@ omada sites refresh
 - **`Expected array at result.data`** — the controller returned an error payload instead of the expected list. Re-check parameters with `omada schema <op>`; a required flag is usually missing or wrong.
 - **Auth failures** — verify the three `OMADA_*` env vars. If the controller uses a self-signed cert, leave `OMADA_SSL_VERIFY` unset (or set to anything other than `true`).
 - **`Multiple sites found; specify --site-id or --site`** — there's no `Default` site and multiple exist. Pick one with `--site <name>`.
+- **400 on a time-range operation** — the controller may enforce an undocumented maximum window for some stat endpoints (e.g. `getAllNetworkActivity` appears capped at 24 hours). If a 48h+ range returns 400, retry with a shorter `--start` value.
+- **`pageSize should not be null` / `page should not be null`** — the operation's spec entry omits `page`/`pageSize` parameters, so the CLI can't generate flags for them and can't inject defaults. This is a controller spec deficiency. There is no CLI workaround; the endpoint is effectively unusable until the controller's spec is corrected.
 
 ## When NOT to use this skill
 
