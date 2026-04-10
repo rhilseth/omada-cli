@@ -59,6 +59,28 @@ The CLI reads these environment variables:
 - `OMADA_SSL_VERIFY` — set to `true` to enable TLS cert verification
   (default: skipped, which suits local controllers with self-signed certs)
 
+## Agent skill
+
+This repo ships a skill at `skills/omada/SKILL.md` that teaches an agent
+harness how to drive the `omada` CLI (discover → inspect → invoke, site
+resolution, pagination defaults, etc.).
+
+Install it for **Claude Code** with:
+
+```sh
+./skills/install.sh              # symlinks into ~/.claude/skills/omada
+./skills/install.sh --copy       # copy instead (no auto-updates)
+./skills/install.sh --uninstall  # remove
+```
+
+Symlinking is the default so updates in this repo flow into every Claude
+Code session immediately — no re-install after `git pull`. The script has
+a `--target` flag reserved for additional agent harnesses; only
+`claude-code` is wired up today because it's the only harness with a
+formal "globally-installable skill" concept. Harnesses that use
+project-level rule files (Cursor, Windsurf, Aider, etc.) can reference
+`skills/omada/SKILL.md` directly from their own config.
+
 ## Usage examples
 
 ```sh
