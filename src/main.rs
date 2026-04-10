@@ -17,10 +17,30 @@ fn s(string: String) -> &'static str {
 }
 
 /// Returns true when the parameter description indicates millisecond timestamps.
+///
+/// Detects explicit labels ("unit: ms", "millisecond") and also infers from
+/// example timestamps: a 13-digit decimal in the description is almost certainly
+/// epoch-milliseconds (e.g. "support field 1679297710438").
 fn param_uses_ms(description: &Option<String>) -> bool {
-    description.as_deref().is_some_and(|d| {
-        d.contains("unit: ms") || d.contains("unit:ms") || d.contains("millisecond")
-    })
+    let Some(d) = description.as_deref() else {
+        return false;
+    };
+    if d.contains("unit: ms") || d.contains("unit:ms") || d.contains("millisecond") {
+        return true;
+    }
+    // Detect a 13-digit example timestamp embedded in the description.
+    let mut run = 0usize;
+    for c in d.chars() {
+        if c.is_ascii_digit() {
+            run += 1;
+            if run == 13 {
+                return true;
+            }
+        } else {
+            run = 0;
+        }
+    }
+    false
 }
 
 /// Resolve a `--start` / `--end` value into the right unit (seconds or ms).
@@ -390,9 +410,12 @@ async fn main() -> Result<()> {
                 }
             }
 
-            // Resolve relative time strings (e.g. "7d", "24h") for start/end params
+            // Resolve relative time strings (e.g. "7d", "24h") for any time-range param.
+            // Covers exact names "start"/"end" plus anything ending in "Start"/"End"
+            // (e.g. filters.timeStart, filters.timeEnd).
             for param in &op.parameters {
-                if !matches!(param.name.as_str(), "start" | "end") {
+                let n = param.name.as_str();
+                if !matches!(n, "start" | "end") && !n.ends_with("Start") && !n.ends_with("End") {
                     continue;
                 }
                 let flag = execute::camel_to_kebab(&param.name);
