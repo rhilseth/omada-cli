@@ -9,7 +9,7 @@ flags derived from its parameters.
 
 - **`src/main.rs`** — Entry point. Builds the clap command tree from the
   cached spec, dispatches to the selected operation, and handles the built-in
-  subcommands (`auth`, `list`, `schema`, `spec refresh`, `sites refresh`).
+  subcommands (`auth`, `config`, `list`, `schema`, `spec refresh`, `sites refresh`).
 - **`src/spec.rs`** — Fetches the OpenAPI document from the controller and
   converts it into the internal `ApiSpec` model. Also resolves `$ref` pointers
   to produce a fully-inlined JSON schema per operation, stored in the cache.
@@ -24,6 +24,8 @@ flags derived from its parameters.
   `Authorization: AccessToken=<token>` on subsequent requests.
 - **`src/sites.rs`** — Fetches and caches the site list so `--site <NAME>` can
   be resolved to a `siteId` offline.
+- **`src/config.rs`** — `Config` struct with `load()` (file + env-var overrides)
+  and `save()`. Stored at `~/.omadacli/config.toml` with mode `0600`.
 - **`src/execute.rs`** — Substitutes path params, collects query params, and
   performs the HTTP request for a given operation.
 
@@ -51,7 +53,25 @@ Both must pass cleanly before considering work done.
 
 ## Configuration
 
-The CLI reads these environment variables:
+Credentials can be stored in `~/.omadacli/config.toml` (created with `omada config`) or provided via environment variables. Env vars always override the file.
+
+```sh
+omada config --base-url https://192.168.1.1:8043 \
+             --client-id <ID> \
+             --client-secret <SECRET> \
+             [--ssl-verify]
+```
+
+The file is written with mode `0600`. Its format:
+
+```toml
+base_url = "https://192.168.1.1:8043"
+client_id = "your-client-id"
+client_secret = "your-client-secret"
+ssl_verify = false
+```
+
+Environment variable overrides (take precedence over the file):
 
 - `OMADA_BASE_URL` — base URL of the controller (e.g. `https://192.168.1.1:8043`)
 - `OMADA_CLIENT_ID` — OpenAPI client ID

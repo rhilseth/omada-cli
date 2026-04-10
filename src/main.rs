@@ -1,5 +1,6 @@
 mod auth;
 mod cache;
+mod config;
 mod execute;
 mod model;
 mod sites;
@@ -145,13 +146,62 @@ async fn get_or_fetch_spec(
     Ok(api_spec)
 }
 
+fn cmd_config() -> Result<()> {
+    let matches = Command::new("omada config")
+        .about("Save controller credentials to ~/.omadacli/config.toml")
+        .arg(
+            Arg::new("base-url")
+                .long("base-url")
+                .value_name("URL")
+                .required(true)
+                .help("Controller base URL (e.g. https://192.168.1.1:8043)"),
+        )
+        .arg(
+            Arg::new("client-id")
+                .long("client-id")
+                .value_name("ID")
+                .required(true)
+                .help("OpenAPI client ID"),
+        )
+        .arg(
+            Arg::new("client-secret")
+                .long("client-secret")
+                .value_name("SECRET")
+                .required(true)
+                .help("OpenAPI client secret"),
+        )
+        .arg(
+            Arg::new("ssl-verify")
+                .long("ssl-verify")
+                .action(clap::ArgAction::SetTrue)
+                .help("Enable TLS certificate verification (default: off)"),
+        )
+        .get_matches_from(std::env::args().skip(1));
+
+    let cfg = config::Config {
+        base_url: matches.get_one::<String>("base-url").unwrap().clone(),
+        client_id: matches.get_one::<String>("client-id").unwrap().clone(),
+        client_secret: matches.get_one::<String>("client-secret").unwrap().clone(),
+        ssl_verify: matches.get_flag("ssl-verify"),
+    };
+    cfg.save()?;
+
+    let path = config::config_path().unwrap();
+    println!("Config saved to {}", path.display());
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let config = auth::Config::from_env()?;
+    // `omada config` needs no credentials — handle before loading config
+    if std::env::args().nth(1).as_deref() == Some("config") {
+        return cmd_config();
+    }
 
-    let ssl_verify = std::env::var("OMADA_SSL_VERIFY").as_deref() == Ok("true");
+    let config = config::Config::load()?;
+
     let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(!ssl_verify)
+        .danger_accept_invalid_certs(!config.ssl_verify)
         .build()?;
 
     let omadac_id = match cache::find_omadac_id() {

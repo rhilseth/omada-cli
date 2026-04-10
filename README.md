@@ -15,7 +15,19 @@ cargo install --path .
 
 ## Configuration
 
-Set these environment variables (e.g. in a `.env` file or your shell profile):
+### Config file (recommended)
+
+```sh
+omada config --base-url https://192.168.1.1:8043 \
+             --client-id your-client-id \
+             --client-secret your-client-secret
+```
+
+This writes `~/.omadacli/config.toml` (mode `0600`). Pass `--ssl-verify` to enable TLS certificate verification (leave it off for controllers with self-signed certs).
+
+### Environment variables
+
+Env vars override the config file. Useful for CI or one-off overrides:
 
 ```sh
 export OMADA_BASE_URL=https://192.168.1.1:8043
@@ -27,6 +39,9 @@ export OMADA_SSL_VERIFY=false   # set to true if your controller has a valid cer
 ## Usage
 
 ```sh
+# Save credentials to ~/.omadacli/config.toml
+omada config --base-url https://192.168.1.1:8043 --client-id <ID> --client-secret <SECRET>
+
 # Verify credentials and show controller info
 omada auth
 

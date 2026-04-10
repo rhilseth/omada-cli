@@ -1,23 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-pub struct Config {
-    pub base_url: String,
-    pub client_id: String,
-    pub client_secret: String,
-}
-
-impl Config {
-    pub fn from_env() -> Result<Self> {
-        Ok(Self {
-            base_url: std::env::var("OMADA_BASE_URL").context("OMADA_BASE_URL env var not set")?,
-            client_id: std::env::var("OMADA_CLIENT_ID")
-                .context("OMADA_CLIENT_ID env var not set")?,
-            client_secret: std::env::var("OMADA_CLIENT_SECRET")
-                .context("OMADA_CLIENT_SECRET env var not set")?,
-        })
-    }
-}
+use crate::config::Config;
 
 pub struct Session {
     pub access_token: String,
