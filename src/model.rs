@@ -18,6 +18,10 @@ pub struct ApiOperation {
     pub has_request_body: bool,
     /// Resolved JSON schema for the request body (pretty-printed), if any.
     pub request_body_schema: Option<String>,
+    /// Body schema has a top-level `page` property — synthesize `--page` flag.
+    pub body_has_page: bool,
+    /// Body schema has a top-level `pageSize` property — synthesize `--page-size` flag.
+    pub body_has_page_size: bool,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug)]

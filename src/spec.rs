@@ -43,6 +43,10 @@ pub fn convert(openapi: &OpenAPI) -> ApiSpec {
                 .request_body
                 .as_ref()
                 .and_then(|rb| extract_request_schema(rb, &root_value));
+            let (body_has_page, body_has_page_size) = request_body_schema
+                .as_deref()
+                .map(body_pagination_flags)
+                .unwrap_or((false, false));
             operations.push(ApiOperation {
                 operation_id: operation_id.clone(),
                 method: method.to_uppercase(),
@@ -52,6 +56,8 @@ pub fn convert(openapi: &OpenAPI) -> ApiSpec {
                 parameters,
                 has_request_body,
                 request_body_schema,
+                body_has_page,
+                body_has_page_size,
             });
         }
     }
@@ -109,6 +115,18 @@ fn extract_request_schema(
         .or_else(|| content.as_object().and_then(|o| o.values().next()))?;
     let schema = media.get("schema")?.clone();
     serde_json::to_string_pretty(&schema).ok()
+}
+
+/// Returns `(has_page, has_page_size)` for top-level properties of a body schema.
+fn body_pagination_flags(schema_json: &str) -> (bool, bool) {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(schema_json) else {
+        return (false, false);
+    };
+    let props = v.get("properties").and_then(|p| p.as_object());
+    match props {
+        Some(p) => (p.contains_key("page"), p.contains_key("pageSize")),
+        None => (false, false),
+    }
 }
 
 pub fn list_operations(spec: &ApiSpec) -> Vec<ListOperation> {

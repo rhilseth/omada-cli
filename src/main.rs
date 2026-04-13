@@ -6,7 +6,7 @@ mod model;
 mod sites;
 mod spec;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Arg, Command};
 use model::{ApiSpec, ParamLocation};
 use std::collections::HashMap;
@@ -201,6 +201,31 @@ fn build_command(spec: &ApiSpec) -> Command {
                     .value_name("JSON")
                     .help("Request body as JSON string"),
             );
+
+            // Some endpoints put `page`/`pageSize` in the request body rather than
+            // as query params. Synthesize flags so the usual defaults apply; they
+            // get merged into the body at execute time. Skip if the same name is
+            // already a query param (guard against double-definition).
+            let has_query_page = op.parameters.iter().any(|p| p.name == "page");
+            let has_query_page_size = op.parameters.iter().any(|p| p.name == "pageSize");
+            if op.body_has_page && !has_query_page {
+                sub = sub.arg(
+                    Arg::new("page")
+                        .long("page")
+                        .value_name("PAGE")
+                        .default_value("1")
+                        .help("Start page number (merged into request body)"),
+                );
+            }
+            if op.body_has_page_size && !has_query_page_size {
+                sub = sub.arg(
+                    Arg::new("page-size")
+                        .long("page-size")
+                        .value_name("PAGESIZE")
+                        .default_value("20")
+                        .help("Entries per page (merged into request body)"),
+                );
+            }
         }
 
         cmd = cmd.subcommand(sub);
@@ -460,10 +485,41 @@ async fn main() -> Result<()> {
                 params.insert("site-id".to_string(), site.id.clone());
             }
 
-            let json_body = op
-                .has_request_body
-                .then(|| sub_m.get_one::<String>("json").cloned())
-                .flatten();
+            let json_body = if op.has_request_body {
+                let has_query_page = op.parameters.iter().any(|p| p.name == "page");
+                let has_query_page_size = op.parameters.iter().any(|p| p.name == "pageSize");
+                let inject_page = op.body_has_page && !has_query_page;
+                let inject_page_size = op.body_has_page_size && !has_query_page_size;
+
+                let user_json = sub_m.get_one::<String>("json").cloned();
+                if inject_page || inject_page_size {
+                    let mut body: serde_json::Value = match user_json.as_deref() {
+                        Some(s) => {
+                            serde_json::from_str(s).context("--json did not parse as JSON")?
+                        }
+                        None => serde_json::json!({}),
+                    };
+                    if let Some(obj) = body.as_object_mut() {
+                        if inject_page
+                            && !obj.contains_key("page")
+                            && let Some(v) = sub_m.get_one::<String>("page")
+                        {
+                            obj.insert("page".into(), v.parse::<i64>()?.into());
+                        }
+                        if inject_page_size
+                            && !obj.contains_key("pageSize")
+                            && let Some(v) = sub_m.get_one::<String>("page-size")
+                        {
+                            obj.insert("pageSize".into(), v.parse::<i64>()?.into());
+                        }
+                    }
+                    Some(serde_json::to_string(&body)?)
+                } else {
+                    user_json
+                }
+            } else {
+                None
+            };
 
             let result = execute::run(
                 &client,
