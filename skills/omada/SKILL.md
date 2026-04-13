@@ -49,9 +49,11 @@ These save flags and should be relied on — don't pass values for these unless 
 
   You can override with `--site <NAME>` (case-insensitive name lookup) or `--site-id <ID>` (raw id).
 
-- **Pagination** — `--page` defaults to `1`, `--page-size` to `20`. Override if the user asks for more/different pages.
+- **Pagination** — `--page` defaults to `1`, `--page-size` to `20`. Override if the user asks for more/different pages. Works uniformly whether the operation takes `page`/`pageSize` as query params or in the request body — the CLI detects body-side pagination from the schema and merges the flag values into the JSON body automatically.
 
-- **Time ranges** — `--start` and `--end` default to "24 hours ago" / "now". They accept relative shorthands: `now`, `Nm` (N minutes ago), `Nh` (N hours ago), `Nd` (N days ago), `Nw` (N weeks ago), or a raw integer timestamp. The CLI auto-detects whether the operation wants seconds or milliseconds from the spec — you never need to do unit conversion or shell arithmetic. This relative-shorthand resolution also applies to any parameter whose name ends in `Start` or `End` (e.g. `--filters.time-start`, `--filters.time-end`).
+- **Time ranges** — `--start` and `--end` default to "24 hours ago" / "now". They accept relative shorthands: `now`, `Nm` (N minutes ago), `Nh` (N hours ago), `Nd` (N days ago), `Nw` (N weeks ago), or a raw integer timestamp. The CLI auto-detects whether the operation wants seconds or milliseconds from the spec — you never need to do unit conversion or shell arithmetic.
+
+  The same relative-shorthand resolution applies to any parameter whose name ends in `Start` or `End`, so operations that expose time filters under a nested name use flags like `--filters.time-start 7d` / `--filters.time-end now` (e.g. `getGridPastConnections`). If `--start`/`--end` errors with "unexpected argument", run `omada schema <op>` and look for a `*Start`/`*End` parameter.
 
 - **`omadacId`** — injected automatically from the session. Never pass it as a flag; it's hidden from the CLI surface.
 
@@ -91,6 +93,14 @@ omada getClientTimeline --client-mac "AA-BB-CC-DD-EE-FF" --type 2 --start 7d
 omada schema createSite
 omada createSite --json '{"name":"branch-office","region":"US"}'
 
+# Looking up a specific client by name or MAC fragment
+# Known clients (all-time, including offline) — search-key is a query flag:
+omada getGridKnownClients --page-size 1000 --search-key "iPhone"
+# All currently-tracked clients — page/pageSize are auto-merged into the body:
+omada getGridAllClients --page-size 500 --json '{"searchKey":"iPhone"}'
+# Exact MAC (use dashes, uppercase):
+omada getClientDetail --client-mac "AB-CD-EF-12-34-56"
+
 # Refresh caches if needed
 omada spec refresh
 omada sites refresh
@@ -104,7 +114,7 @@ omada sites refresh
 - **Auth failures** — verify the three `OMADA_*` env vars. If the controller uses a self-signed cert, leave `OMADA_SSL_VERIFY` unset (or set to anything other than `true`).
 - **`Multiple sites found; specify --site-id or --site`** — there's no `Default` site and multiple exist. Pick one with `--site <name>`.
 - **400 on a time-range operation** — the controller may enforce an undocumented maximum window for some stat endpoints (e.g. `getAllNetworkActivity` appears capped at 24 hours). If a 48h+ range returns 400, retry with a shorter `--start` value.
-- **`pageSize should not be null` / `page should not be null`** — the operation's spec entry omits `page`/`pageSize` parameters, so the CLI can't generate flags for them and can't inject defaults. This is a controller spec deficiency. There is no CLI workaround; the endpoint is effectively unusable until the controller's spec is corrected.
+- **`pageSize should not be null` / `page should not be null`** — shouldn't happen on current builds; the CLI auto-merges `--page`/`--page-size` into the body when needed. If you see it on an old binary, upgrade — or as a workaround, pass `--json '{"page":1,"pageSize":500, ...}'`.
 
 ## When NOT to use this skill
 
